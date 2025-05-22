@@ -5,7 +5,45 @@ An "operating system" on Python. To use it, you must use `build.sh`, which autom
 
 For now, only compatible for Debian-based Linux distributions, we will add soon compatibility for other distributions. PS: Don't use Windows build (`build.bat`), as it is out of date and does not build system fully.
 ## How to build system manually?
+### 0. Manual Download and Build (Alternative for Linux)
 
+If you prefer to manually handle the download and extraction, follow these steps:
+
+1. Download the PyOS archive:
+
+```bash
+wget https://github.com/Upload-and-View/PyOS/releases/download/first-release/os.tar.xz -O os.tar.xz
+```
+This command downloads the os.tar.xz file and saves it with the specified name in your current directory.
+2. Extract the archive:
+
+```bash
+tar -xJf os.tar.xz
+```
+This command extracts the contents of the .tar.xz file. The -x flag is for extract, -J for XZ compression, and -f to specify the file.
+
+3. Navigate into the extracted directory:
+```bash
+    # IMPORTANT: The name of the extracted directory might vary depending on how
+    # the archive was created. You can run 'ls' after extraction to see the exact name.
+    # Common names are 'PyOS-first-release' or 'Upload-and-View-PyOS-first-release'.
+
+    cd Upload-and-View-PyOS-first-release 
+    # Example: If 'ls' shows 'PyOS-first-release', then:
+    # cd PyOS-first-release
+    # If 'ls' shows 'PyOS', then:
+    # cd PyOS
+```
+4. Make the build.sh script executable:
+```bash
+chmod +x build.sh
+```
+5. Run the build script:
+```bash
+    ./build.sh
+```
+This will execute the main build process for PyOS. 
+  
 If you are on Windows, or on other distribution of Linux which is not based off Ubuntu, you might use this method:
 ### 1. Build main stuff.
 
