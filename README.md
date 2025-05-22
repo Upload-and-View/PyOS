@@ -32,7 +32,7 @@ chmod +x build.sh
 ```
 5. Run the build script:
 ```bash
-    ./build.sh
+./build.sh
 ```
 This will execute the main build process for PyOS. 
   
