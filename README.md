@@ -24,7 +24,7 @@ This command extracts the contents of the .tar.xz file. The -x flag is for extra
 
 3. Navigate into the extracted directory:
 ```bash
-    cd os
+cd os
 ```
 4. Make the build.sh script executable:
 ```bash
