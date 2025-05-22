@@ -134,8 +134,11 @@ pip install passlib
 (Ensure Python and pip are installed and in PATH, consider using 'pip3' if you have multiple Python versions or a virtual environment)
 
 Go back to root directory where system is installed
+
 Now go to _system
+
 Make a file named _passwords
+
 Edit it so it would look like this:
 ```json
 {
@@ -240,7 +243,7 @@ Make so it would look like this:
 ```python
 #!/usr/bin/env python3
 #    PyOS, an "operating system" running on Python.
-#    Copyright (C) 2025  Muser
+#    Copyright (C) 2025 Muser
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -259,7 +262,9 @@ from pathlib import Path
 import os
 import getpass
 import socket
-from passlib.hash import sha512_crypt # Added: Modern password hashing/verification library
+import re # NEW: Import the regex module for variable expansion
+import importlib # NEW: Import importlib for dynamic package loading
+import subprocess # NEW: Import subprocess for launching GUI apps
 
 # --- Check and import passlib ---
 try:
@@ -273,7 +278,7 @@ except ImportError:
     sys.exit(1)
 # --- End passlib check ---
 
-# Add the _packages directory to sys.path so gum can be imported
+# Add the _packages directory to sys.path so gum and other packages can be imported
 curr_dir = Path(__file__).resolve().parent
 packages_dir = curr_dir / "_packages"
 if str(packages_dir) not in sys.path:
@@ -281,7 +286,6 @@ if str(packages_dir) not in sys.path:
 
 # --- Package Manager Check and Import ---
 # This function checks if the 'gum' package manager can be imported.
-# It's defined here because it needs to be accessible before the main loop.
 def checkforpackagemanager():
     try:
         # Attempt to import gum. This will succeed if _packages/gum/__init__.py exists
@@ -293,9 +297,63 @@ def checkforpackagemanager():
         return 1 # Failure
 
 # Import gum after sys.path is updated and checkforpackagemanager is defined
-# This is done here so that `gum` is available for use in `emulate`
 import gum 
 # --- End Package Manager Check and Import ---
+
+# --- Global dictionary to store dynamically loaded package commands ---
+_package_commands = {} # Maps command_name -> function_to_handle_command
+
+# --- Function to register package commands ---
+def register_package_command(command_name, handler_func):
+    """
+    Registers a command from an installed package.
+    command_name: The string command (e.g., "calc").
+    handler_func: The Python function that handles this command.
+    """
+    if command_name in _package_commands:
+        print(f"Warning: Command '{command_name}' from package is already registered. Overwriting.", file=sys.stderr)
+    _package_commands[command_name] = handler_func
+    # print(f"Registered package command: {command_name}") # Optional debug
+
+# --- Function to load commands from installed packages ---
+def load_package_commands():
+    """
+    Scans the _packages directory, imports Python packages, and calls their
+    'register_shell_commands' function to register new commands with PyOS.
+    """
+    packages_root_dir = curr_dir / "_packages" # Use the global curr_dir
+    
+    if not packages_root_dir.is_dir():
+        print(f"Warning: Package root directory '{packages_root_dir}' not found. No external commands will be loaded.", file=sys.stderr)
+        return
+
+    # Ensure the root package directory is in sys.path (already done above, but good to be explicit)
+    if str(packages_root_dir) not in sys.path:
+        sys.path.insert(0, str(packages_root_dir)) # Insert at the beginning to prioritize packages
+
+    for item in packages_root_dir.iterdir():
+        # Check if it's a directory and contains an __init__.py (i.e., a Python package)
+        if item.is_dir() and (item / "__init__.py").is_file(): 
+            module_name = item.name # Get the directory name (e.g., 'calculator')
+            try:
+                # Dynamically import the package's __init__.py as a module
+                package_module = importlib.import_module(module_name)
+                
+                # Check if the package has a specific function to register its commands
+                # We'll expect a function named 'register_shell_commands' in its __init__.py
+                if hasattr(package_module, 'register_shell_commands') and callable(package_module.register_shell_commands):
+                    # Call this function, passing our shell's registration mechanism
+                    package_module.register_shell_commands(register_package_command)
+                    # print(f"Loaded commands from package: {module_name}") # Optional debug
+                # else:
+                    # print(f"Info: Package '{module_name}' has no 'register_shell_commands' function. Skipping command registration.", file=sys.stderr)
+
+            except Exception as e:
+                print(f"Error loading commands from package '{module_name}': {e}", file=sys.stderr)
+
+# Call load_package_commands after sys.path is set up and gum is imported
+load_package_commands()
+# --- End NEW: Package Command System ---
 
 
 def checkforbuild():
@@ -312,7 +370,6 @@ def checkforbuild():
     
     # First, check if the file exists
     if not build_flag_file.is_file():
-        # print(f"Debug: Build flag file not found at {build_flag_file}") # Optional debug print
         return False # File doesn't exist, so it's not built
 
     # If the file exists, try to read its content
@@ -323,18 +380,13 @@ def checkforbuild():
         
         # Check if the content is exactly "True"
         is_content_true = (content == "True")
-        # print(f"Debug: File content '{content}' matches 'True': {is_content_true}") # Optional debug print
         
         # Return True only if the file exists AND its content is "True"
         return is_content_true
 
     except FileNotFoundError:
-        # This case should ideally be caught by build_flag_file.is_file()
-        # but is good practice for robustness in file operations.
-        # print(f"Debug: File not found during open, despite is_file() check: {build_flag_file}") # Optional debug print
         return False
     except Exception as e:
-        # Catch any other potential errors during file reading (e.g., permission issues)
         print(f"Error reading _isbuilded file: {e}", file=sys.stderr)
         return False
 
@@ -346,9 +398,7 @@ def get_stored_passwords(passwords_file_path):
     will overwrite previous ones, effectively getting the "latest" password.
     """
     stored_data = {}
-    print(f"DEBUG: Checking password file at: {passwords_file_path}", file=sys.stderr) # DEBUG
     if not Path(passwords_file_path).is_file():
-        print(f"DEBUG: Password file not found: {passwords_file_path}", file=sys.stderr) # DEBUG
         return stored_data # Return empty if file doesn't exist
 
     try:
@@ -356,21 +406,15 @@ def get_stored_passwords(passwords_file_path):
             lines = f.readlines()
             for line in lines: # Iterate through lines normally
                 line = line.strip()
-                print(f"DEBUG: Reading line (for parsing): '{line}'", file=sys.stderr) # DEBUG
                 # Look for lines that contain ':' and are not just '{' or '}'
                 if ':' in line and not line.startswith('{') and not line.endswith('}'):
                     content = line.strip(';') # Remove trailing semicolon if present
-                    print(f"DEBUG: Parsed content: '{content}'", file=sys.stderr) # DEBUG
                     key, value = content.split(':', 1)
                     stored_data[key.strip()] = value.strip()
-                    print(f"DEBUG: Added to stored_data: '{key.strip()}': '{value.strip()}'", file=sys.stderr) # DEBUG
     except Exception as e:
         print(f"Error reading or parsing _passwords file: {e}", file=sys.stderr)
         return {}
-    print(f"DEBUG: Final stored_data: {stored_data}", file=sys.stderr) # DEBUG
     return stored_data
-
-# Removed hash_password_for_comparison as it's no longer needed for verification in Python
 
 def verify_password(username_input, password_input):
     """
@@ -387,7 +431,6 @@ def verify_password(username_input, password_input):
         return False
 
     stored_hash = stored_passwords[username_input]
-    print(f"DEBUG: Stored hash for '{username_input}': '{stored_hash}'", file=sys.stderr) # DEBUG
 
     try:
         # Use passlib's sha512_crypt.verify method
@@ -565,9 +608,32 @@ def remove_directory(dirpath):
 
 # --- End New File and Directory Operations ---
 
+# --- Global dictionary to store shell variables ---
+_shell_variables = {}
+
+def expand_variables(input_string):
+    """
+    Replaces @(varname) with actual variable values from _shell_variables.
+    If a variable is not found, it's replaced with an empty string and a warning is printed.
+    """
+    def replace_var(match):
+        var_name = match.group(1) # The content inside the parentheses
+        if var_name in _shell_variables:
+            return _shell_variables[var_name]
+        else:
+            print(f"Warning: Variable '{var_name}' not found. Replacing with empty string.", file=sys.stderr)
+            return "" # Replace with empty string if variable is not defined
+    
+    # Use re.sub to find all @(varname) patterns and replace them
+    # \w+ matches one or more word characters (alphanumeric + underscore)
+    return re.sub(r'@\((\w+)\)', replace_var, input_string)
+
 
 def emulate(promptline):
-    tokens = shlex.split(promptline)
+    # --- Pre-process the input for variable expansion ---
+    processed_promptline = expand_variables(promptline)
+    
+    tokens = shlex.split(processed_promptline)
     if not tokens:
         return
     command = tokens[0]
@@ -585,6 +651,25 @@ def emulate(promptline):
                 print("Login failed: Incorrect username or password.")
         else:
             print("Usage: login <username> <password>")
+    # --- 'let' command for variable assignment ---
+    elif command == "let":
+        if len(args) == 1 and "=" in args[0]:
+            var_assignment = args[0].split('=', 1) # Split only on the first '='
+            var_name = var_assignment[0].strip()
+            var_value = var_assignment[1].strip()
+            _shell_variables[var_name] = var_value
+            print(f"Variable '{var_name}' set to '{var_value}'")
+        else:
+            print("Usage: let <varname>=<value>")
+    # --- 'vars' command to show current variables ---
+    elif command == "vars":
+        if _shell_variables:
+            print("Current shell variables:")
+            for var, val in _shell_variables.items():
+                print(f"  {var}='{val}'")
+        else:
+            print("No shell variables currently set.")
+    # --- Existing Commands ---
     elif command == "lc": # New 'lc' command
         if len(args) == 0:
             list_content_colored(os.getcwd()) # List current directory
@@ -598,7 +683,7 @@ def emulate(promptline):
         else:
             print("Usage: cd <directory>")
     elif command == "about": # New 'about' command with updated message
-        print("PyOS V1.0")
+        print("PyOS V1.1")
         print("Copyright (C) 2025 Muser") # Using your provided copyright info
         print("This program comes with ABSOLUTELY NO WARRANTY; for details type `show w'.")
         print("This is free software, and you are welcome to redistribute it")
@@ -644,13 +729,27 @@ def emulate(promptline):
             make_directory(args[0])
         else:
             print("Usage: mkdir <directory_path>")
+    elif command == "echo":
+        if args and args[0] == "-e": # Added 'args and' for robustness against empty 'args'
+            myargs = args[1:]
+            newargs = []
+            for arg in myargs:
+                arg = arg.replace("\\e", "\033")
+                arg = arg.replace("\\n", "\n")
+                arg = arg.replace("\\t", "\t") 
+                arg = arg.replace("\\r", "\r") 
+                arg = arg.replace("\\\\", "\\")
+                newargs.append(arg)
+            print(" ".join(newargs))
+        else:
+            print(" ".join(args))
     elif command == "rmdir":
         if len(args) == 1:
             remove_directory(args[0])
         else:
             print("Usage: rmdir <directory_path>")
     # --- End File and Directory Commands ---
-    elif command == "gum": # New command for gum package manager
+    elif command == "gum": # Command for gum package manager
         if len(args) == 1:
             if checkforpackagemanager() == 1:
                 print("Gum not properly installed.")
@@ -658,7 +757,13 @@ def emulate(promptline):
                 gum.installpkg(args[0])
         else:
             print("Usage: gum <package_url>")
-    else:
+    elif command == "pwd":
+        print(os.getcwd())
+    # --- Check for package commands before 'Unknown command' ---
+    elif command in _package_commands:
+        _package_commands[command](args) # Call the registered package handler
+    # --- End NEW package command check ---
+    else: # This 'else' block will now only be reached if it's NOT an internal or package command
         print(f"Unknown command: {command}")
 
 # Example of how you might use it in a main loop
@@ -667,7 +772,8 @@ if __name__ == "__main__":
         print("PyOS is not built. Please run build.sh first.")
         sys.exit(1)
 
-    print("PyOS is built. You can now use commands like 'login', 'lc', 'cd', 'about', 'show', 'readfile', 'mkfile', 'rmfile', 'mkdir', 'rmdir', 'gum'.")
+    print("PyOS is built. You can now use internal commands like 'login', 'lc', 'cd', 'about', 'show', 'readfile', 'mkfile', 'rmfile', 'mkdir', 'rmdir', 'gum', 'let', 'vars'.") # Updated help message
+    print("Commands from installed packages are also available.") # Optional message
     while True:
         try:
             # Updated prompt line to include current working directory
@@ -678,9 +784,11 @@ if __name__ == "__main__":
         except EOFError: # Handle Ctrl+D
             break
         except KeyboardInterrupt: # Handle Ctrl+C
+            print("\nExiting PyOS.") # Nicer exit message
             break
         except Exception as e:
-            print(f"An error occurred: {e}", file=sys.stderr)
+            print(f"An unexpected error occurred: {e}", file=sys.stderr)
+
 
 
 ```
