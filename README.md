@@ -24,15 +24,7 @@ This command extracts the contents of the .tar.xz file. The -x flag is for extra
 
 3. Navigate into the extracted directory:
 ```bash
-    # IMPORTANT: The name of the extracted directory might vary depending on how
-    # the archive was created. You can run 'ls' after extraction to see the exact name.
-    # Common names are 'PyOS-first-release' or 'Upload-and-View-PyOS-first-release'.
-
-    cd Upload-and-View-PyOS-first-release 
-    # Example: If 'ls' shows 'PyOS-first-release', then:
-    # cd PyOS-first-release
-    # If 'ls' shows 'PyOS', then:
-    # cd PyOS
+    cd os
 ```
 4. Make the build.sh script executable:
 ```bash
