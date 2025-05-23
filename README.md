@@ -1,4 +1,6 @@
 # PyOS:
+## Notice
+I would be tough againist people who don't understand it is for Python. You can download Python [here](https://www.python.org/downloads/).
 ## Description:
 
 An "operating system" on Python. To use it, you must use `build.sh`, which automatically starts whenever installer is running.
