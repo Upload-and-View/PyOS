@@ -146,7 +146,7 @@ Edit it so it would look like this:
 }
 ```
 Where yourusername is your user name, and yourpasswordhash is hash of password you got using this command:
-```bash
+```python
 print($(openssl passwd -6 "$yourpasswordhere")
 ```
 Where yourpasswordhere is your password you want to add to user.
