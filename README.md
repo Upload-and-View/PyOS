@@ -1,6 +1,7 @@
 # PyOS:
 ## Notice
 I would be tough against people who don't understand it is for Python. You can download Python [here](https://www.python.org/downloads/).
+Also, this IS NOT REAL OPERATING SYSTEM, THIS IS A SIMULATOR OF OPERATING SYSTEM SO DON'T BEG ME FOR ISO FILE.
 ## Description:
 
 An "operating system" on Python. To use it, you must use `build.sh`, which automatically starts whenever installer is running.
